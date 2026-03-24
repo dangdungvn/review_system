@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(gh search:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:cursor.directory)",
+      "Bash(npm -v)",
+      "Bash(npx @nestjs/cli@latest new . --package-manager npm --skip-git --strict)",
+      "Bash(mkdir -p .claude/skills)",
+      "Bash(cp -r _temp_skills/skills/nestjs/* .claude/skills/)",
+      "Bash(cp .env.example .env)",
+      "Bash(rm -rf _temp_skills)",
+      "Bash(npm run:*)"
+    ]
+  }
+}
