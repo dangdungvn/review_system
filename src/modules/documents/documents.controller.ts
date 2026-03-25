@@ -16,9 +16,11 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { DocumentsService } from './documents.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Documents')
 @Controller('documents')
+@Public() // Tạm thời public tất cả endpoints, có thể điều chỉnh sau
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 

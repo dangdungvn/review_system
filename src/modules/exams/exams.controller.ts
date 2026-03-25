@@ -8,9 +8,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ExamsService } from './exams.service';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Exams')
 @Controller('exams')
+@Public() // Tạm thời public tất cả endpoints
 export class ExamsController {
   constructor(private readonly examsService: ExamsService) {}
 

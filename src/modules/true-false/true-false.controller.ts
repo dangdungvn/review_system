@@ -8,9 +8,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { TrueFalseService } from './true-false.service';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('True/False')
 @Controller('true-false')
+@Public() // Tạm thời public tất cả endpoints
 export class TrueFalseController {
   constructor(private readonly trueFalseService: TrueFalseService) {}
 

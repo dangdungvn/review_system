@@ -8,9 +8,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { FlashcardsService } from './flashcards.service';
+import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Flashcards')
 @Controller('flashcard-sets')
+@Public() // Tạm thời public tất cả endpoints
 export class FlashcardsController {
   constructor(private readonly flashcardsService: FlashcardsService) {}
 
