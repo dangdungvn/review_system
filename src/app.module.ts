@@ -11,6 +11,7 @@ import { FlashcardsModule } from './modules/flashcards/flashcards.module';
 import { TrueFalseModule } from './modules/true-false/true-false.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AssessmentModule } from './modules/assessment/assessment.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AuthModule } from './modules/auth/auth.module';
     ExamsModule,
     FlashcardsModule,
     TrueFalseModule,
+    AssessmentModule,
   ],
 })
 export class AppModule {}

@@ -21,7 +21,12 @@
       "Bash(node -e \":*)",
       "Bash(cd \"D:\\\\Workspace\\\\backend\\\\review_system\" && node -e \"const p = require\\('pdf-parse'\\); console.log\\(Object.keys\\(p\\)\\)\" 2>&1 | head -5)",
       "Bash(cd \"D:\\\\Workspace\\\\backend\\\\review_system\" && node -e \"const p = require\\('pdf-parse'\\); console.log\\(typeof p.PDFParse, typeof p.default, typeof p.getDocument\\)\" 2>&1)",
-      "Bash(cd \"D:\\\\Workspace\\\\backend\\\\review_system\" && node -e \"\nconst { PDFParse } = require\\('pdf-parse'\\);\nconst fs = require\\('fs'\\);\nconst buf = fs.readFileSync\\('uploads/6eb461fd-ea7a-4cc7-b744-a5fa02e99f99.pdf'\\);\nconst uint8 = new Uint8Array\\(buf\\);\nconst parser = new PDFParse\\(uint8\\);\nparser.getText\\(\\).then\\(r => console.log\\('OK, length:', r.text.length\\)\\).catch\\(e => console.error\\('ERR:', e.message\\)\\);\n\" 2>&1)"
+      "Bash(cd \"D:\\\\Workspace\\\\backend\\\\review_system\" && node -e \"\nconst { PDFParse } = require\\('pdf-parse'\\);\nconst fs = require\\('fs'\\);\nconst buf = fs.readFileSync\\('uploads/6eb461fd-ea7a-4cc7-b744-a5fa02e99f99.pdf'\\);\nconst uint8 = new Uint8Array\\(buf\\);\nconst parser = new PDFParse\\(uint8\\);\nparser.getText\\(\\).then\\(r => console.log\\('OK, length:', r.text.length\\)\\).catch\\(e => console.error\\('ERR:', e.message\\)\\);\n\" 2>&1)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 7316 /F)",
+      "Bash(cmd /c \"taskkill /PID 7316 /F\")",
+      "Bash(cmd /c \"taskkill /PID 7316 /F 2>&1\")",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

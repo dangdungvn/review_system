@@ -9,7 +9,7 @@ import { trueFalsePrompt } from './prompts/true-false.prompt';
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly genAI: GoogleGenerativeAI;
-  private readonly model: string = 'gemini-2.5-flash-lite';
+  private readonly model: string = 'gemini-3-flash-preview';
 
   constructor(private readonly configService: ConfigService) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY', '');
