@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Exam, ExamStatus } from './entities/exam.entity';
@@ -19,8 +19,9 @@ export class ExamsService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async generate(documentId: number): Promise<Exam> {
-    const document = await this.documentsService.findOne(documentId);
+  async generate(documentId: number, userId: string): Promise<Exam> {
+    // Enforce document ownership
+    const document = await this.documentsService.findOne(documentId, userId);
 
     if (!document.extractedText) {
       throw new NotFoundException('Document has no extracted text');
@@ -28,6 +29,7 @@ export class ExamsService {
 
     const exam = this.examRepo.create({
       documentId,
+      userId,
       title: `Đề thi trắc nghiệm - ${document.title}`,
       status: ExamStatus.GENERATING,
     });
@@ -55,28 +57,32 @@ export class ExamsService {
       await this.questionRepo.save(questions);
       exam.totalQuestions = questions.length;
       exam.status = ExamStatus.COMPLETED;
-    } catch (error) {
-      this.logger.error(`Failed to generate exam: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to generate exam: ${message}`);
       exam.status = ExamStatus.FAILED;
     }
 
     return this.examRepo.save(exam);
   }
 
-  async findByDocument(documentId: number): Promise<Exam[]> {
+  async findByDocument(documentId: number, userId: string): Promise<Exam[]> {
     return this.examRepo.find({
-      where: { documentId },
+      where: { documentId, userId },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findOne(id: number): Promise<Exam> {
+  async findOne(id: number, userId?: string): Promise<Exam> {
     const exam = await this.examRepo.findOne({
       where: { id },
       relations: ['questions'],
     });
     if (!exam) {
       throw new NotFoundException(`Exam #${id} not found`);
+    }
+    if (userId && exam.userId !== userId) {
+      throw new ForbiddenException('Access denied to this exam');
     }
     return exam;
   }

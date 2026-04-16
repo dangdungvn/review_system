@@ -5,9 +5,8 @@ import {
   Body,
   Param,
   ParseIntPipe,
-  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { AssessmentService } from './services/assessment.service';
 import { RecommendationService } from './services/recommendation.service';
 import {
@@ -17,13 +16,12 @@ import {
   ActivitySuggestionDto,
   UserProgressDto,
 } from './dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '../users/entities/user.entity';
+import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
 
 @ApiTags('Assessment')
+@ApiBearerAuth('JWT')
 @Controller('assessment')
-@UseGuards(JwtAuthGuard)
 export class AssessmentController {
   constructor(
     private readonly assessmentService: AssessmentService,
@@ -41,13 +39,14 @@ export class AssessmentController {
     description: 'Exam submitted successfully',
     type: ExamResultDto,
   })
+  @ApiResponse({ status: 404, description: 'Exam not found' })
   async submitExam(
-    @CurrentUser() user: User,
+    @CurrentUser() user: JwtUser,
     @Param('examId', ParseIntPipe) examId: number,
     @Body() dto: SubmitExamAttemptDto,
   ): Promise<ExamResultDto> {
     return await this.assessmentService.submitExamAttempt(
-      user.id,
+      user.userId,
       examId,
       dto,
     );
@@ -64,9 +63,9 @@ export class AssessmentController {
     type: [RecommendationDto],
   })
   async getRecommendations(
-    @CurrentUser() user: User,
+    @CurrentUser() user: JwtUser,
   ): Promise<RecommendationDto[]> {
-    return await this.recommendationService.getRecommendations(user.id);
+    return await this.recommendationService.getRecommendations(user.userId);
   }
 
   @Get('next-activity')
@@ -80,9 +79,9 @@ export class AssessmentController {
     type: ActivitySuggestionDto,
   })
   async getNextActivity(
-    @CurrentUser() user: User,
+    @CurrentUser() user: JwtUser,
   ): Promise<ActivitySuggestionDto | null> {
-    return await this.recommendationService.getNextActivity(user.id);
+    return await this.recommendationService.getNextActivity(user.userId);
   }
 
   @Get('progress')
@@ -95,7 +94,7 @@ export class AssessmentController {
     description: 'Progress retrieved successfully',
     type: UserProgressDto,
   })
-  async getProgress(@CurrentUser() user: User): Promise<UserProgressDto> {
-    return await this.assessmentService.getUserProgress(user.id);
+  async getProgress(@CurrentUser() user: JwtUser): Promise<UserProgressDto> {
+    return await this.assessmentService.getUserProgress(user.userId);
   }
 }

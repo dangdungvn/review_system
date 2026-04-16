@@ -6,6 +6,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Document } from '../../documents/entities/document.entity';
 import { Flashcard } from './flashcard.entity';
@@ -17,6 +18,7 @@ export enum FlashcardSetStatus {
 }
 
 @Entity('flashcard_sets')
+@Index(['userId', 'createdAt'])
 export class FlashcardSet {
   @PrimaryGeneratedColumn()
   id: number;
@@ -27,6 +29,9 @@ export class FlashcardSet {
   @ManyToOne(() => Document, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'documentId' })
   document: Document;
+
+  @Column()
+  userId: string;
 
   @Column({ length: 255 })
   title: string;

@@ -1,13 +1,13 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, MoreThanOrEqual } from 'typeorm';
 import {
   UserExamAttempt,
   UserAnswer,
   UserLearningProfile,
+  UserFlashcardProgress,
 } from '../entities';
 import { Exam } from '../../exams/entities/exam.entity';
-import { ExamQuestion } from '../../exams/entities/exam-question.entity';
 import {
   SubmitExamAttemptDto,
   ExamResultDto,
@@ -16,7 +16,7 @@ import {
 import { BayesianKnowledgeTracingService } from './bayesian-knowledge-tracing.service';
 import { ItemResponseTheoryService } from './item-response-theory.service';
 import { AIService } from './ai.service';
-import { ConfidenceLevel } from '../enums';
+import { ConfidenceLevel, LearningStyle, FlashcardStatus } from '../enums';
 import type { ExamBehavioralData } from '../interfaces/behavioral-data.interface';
 
 @Injectable()
@@ -26,12 +26,10 @@ export class AssessmentService {
   constructor(
     @InjectRepository(UserExamAttempt)
     private attemptRepo: Repository<UserExamAttempt>,
-    @InjectRepository(UserAnswer)
-    private answerRepo: Repository<UserAnswer>,
-    @InjectRepository(Exam)
-    private examRepo: Repository<Exam>,
     @InjectRepository(UserLearningProfile)
     private profileRepo: Repository<UserLearningProfile>,
+    @InjectRepository(UserFlashcardProgress)
+    private flashcardProgressRepo: Repository<UserFlashcardProgress>,
     private dataSource: DataSource,
     private bktService: BayesianKnowledgeTracingService,
     private irtService: ItemResponseTheoryService,
@@ -62,7 +60,6 @@ export class AssessmentService {
         where: { userId, examId },
       });
       const attemptNumber = previousAttempts + 1;
-      const isFirstAttempt = attemptNumber === 1;
 
       // 3. Process answers and calculate metrics
       const metrics = this.calculateMetrics(exam, dto);
@@ -135,8 +132,7 @@ export class AssessmentService {
       );
 
       // === ASYNC UPDATES (don't block response) ===
-      // Run in background
-      this.updateKnowledgeStatesAsync(userId, attempt.id, userAnswers).catch(
+      this.updateKnowledgeStatesAsync(userId, userAnswers).catch(
         (err) => this.logger.error('BKT update failed', err),
       );
 
@@ -144,11 +140,11 @@ export class AssessmentService {
         this.logger.error('IRT update failed', err),
       );
 
-      this.updateQuestionParamsAsync(userAnswers).catch((err) =>
+      this.updateQuestionParamsAsync(userId, userAnswers).catch((err) =>
         this.logger.error('Question IRT update failed', err),
       );
 
-      this.updateLearningProfileAsync(userId).catch((err) =>
+      this.updateLearningProfileAsync(userId, behavioralData).catch((err) =>
         this.logger.error('Profile update failed', err),
       );
 
@@ -226,7 +222,13 @@ export class AssessmentService {
    */
   private extractBehavioralSignals(
     dto: SubmitExamAttemptDto,
-    metrics: any,
+    metrics: {
+      correctAnswers: number;
+      score: number;
+      confidentCorrect: number;
+      uncertainCorrect: number;
+      guessingCorrect: number;
+    },
     attemptNumber: number,
   ): ExamBehavioralData {
     const avgTime = dto.totalTimeSpentSeconds / dto.answers.length;
@@ -290,13 +292,10 @@ export class AssessmentService {
    */
   private async updateKnowledgeStatesAsync(
     userId: string,
-    attemptId: string,
     answers: UserAnswer[],
   ): Promise<void> {
     for (const answer of answers) {
-      // Map question to skill (simplified: use examId as skill)
       const skillId = `exam_question_${answer.questionId}`;
-
       await this.bktService.updateKnowledgeState(userId, skillId, {
         timestamp: answer.answeredAt,
         questionId: answer.questionId,
@@ -304,7 +303,7 @@ export class AssessmentService {
         confidence: answer.confidence,
         timeSpent: answer.timeSpentSeconds,
         contextualFactors: {
-          difficulty: 0, // TODO: get from IRT
+          difficulty: 0,
           timeOfDay: 'morning',
           isRetry: false,
         },
@@ -326,14 +325,12 @@ export class AssessmentService {
 
   /**
    * Update question IRT params - async
+   * FIX: userId từ parameter, không cần load relation
    */
   private async updateQuestionParamsAsync(
+    userId: string,
     answers: UserAnswer[],
   ): Promise<void> {
-    // Get user ability first
-    const userId = answers[0]?.attempt?.userId;
-    if (!userId) return;
-
     const ability = await this.irtService.getUserAbility(userId);
     const theta = ability ? Number(ability.globalTheta) : 0;
 
@@ -350,33 +347,120 @@ export class AssessmentService {
 
   /**
    * Update learning profile - async
+   * Classify learning style dựa trên behavioral data
    */
-  private async updateLearningProfileAsync(userId: string): Promise<void> {
-    // TODO: Implement learning style classification
-    // For now, just ensure profile exists
+  private async updateLearningProfileAsync(
+    userId: string,
+    behavioralData: ExamBehavioralData,
+  ): Promise<void> {
     let profile = await this.profileRepo.findOne({ where: { userId } });
 
     if (!profile) {
-      profile = this.profileRepo.create({
-        userId,
-      });
-      await this.profileRepo.save(profile);
+      profile = this.profileRepo.create({ userId });
     }
+
+    // Classify learning style
+    const style = this.classifyLearningStyle(behavioralData, profile);
+    profile.primaryStyle = style;
+
+    // Update behavioral characteristics
+    profile.focusScore = Math.max(
+      0,
+      Math.min(1, 1 - behavioralData.backtrackingCount / 10),
+    );
+    profile.persistenceLevel = behavioralData.isRetry ? 0.8 : 0.5;
+    profile.confidenceCalibration = behavioralData.confidenceCalibration;
+
+    // Detect patterns
+    const detectedIssues = {
+      hasGuessPattern: behavioralData.guessingCorrect > 3,
+      hasRushingPattern: behavioralData.rushingPattern,
+      hasGivingUpPattern: behavioralData.skippedCount > 5,
+      hasOverconfidencePattern:
+        behavioralData.confidenceCalibration < 0.5 &&
+        behavioralData.confidentCorrect > 2,
+      hasCheatingSuspicion:
+        behavioralData.averageTimePerQuestion < 5 &&
+        (behavioralData.correctCount / (behavioralData.correctCount + behavioralData.incorrectCount)) > 0.9,
+    };
+    profile.detectedIssues = detectedIssues;
+
+    await this.profileRepo.save(profile);
   }
 
   /**
-   * Get user progress
+   * Classify learning style từ behavioral data
+   */
+  private classifyLearningStyle(
+    data: ExamBehavioralData,
+    currentProfile: UserLearningProfile,
+  ): LearningStyle {
+    const accuracy =
+      data.correctCount / (data.correctCount + data.incorrectCount);
+
+    // Fast learner: cao accuracy, không retry nhiều, ít backtrack
+    if (accuracy > 0.85 && !data.isRetry && data.backtrackingCount < 3) {
+      return LearningStyle.FAST_LEARNER;
+    }
+
+    // Perfectionist: retry nhiều, accuracy cải thiện
+    if (data.isRetry && data.retryNumber >= 3) {
+      return LearningStyle.PERFECTIONIST;
+    }
+
+    // Rushing pattern
+    if (data.rushingPattern) {
+      return LearningStyle.SURFACE_LEARNER;
+    }
+
+    // Deep learner: overthinking, cao accuracy
+    if (data.overthinkingPattern && accuracy > 0.7) {
+      return LearningStyle.DEEP_LEARNER;
+    }
+
+    // Struggling: accuracy thấp
+    if (accuracy < 0.5) {
+      return LearningStyle.STRUGGLING;
+    }
+
+    // Steady improver
+    if (data.isRetry && accuracy > Number(currentProfile.styleConfidence)) {
+      return LearningStyle.STEADY_IMPROVER;
+    }
+
+    return currentProfile.primaryStyle === LearningStyle.UNKNOWN
+      ? LearningStyle.STEADY_IMPROVER
+      : currentProfile.primaryStyle;
+  }
+
+  /**
+   * Get user progress - với real streak và flashcard mastery
    */
   async getUserProgress(userId: string): Promise<UserProgressDto> {
     const examsCompleted = await this.attemptRepo.count({
       where: { userId, isCompleted: true },
     });
 
-    // TODO: Get actual flashcard mastery count
-    const flashcardsMastered = 0;
+    // Tính flashcard mastered (masteryLevel >= 0.8)
+    const masteredFlashcards = await this.flashcardProgressRepo.count({
+      where: {
+        userId,
+        status: FlashcardStatus.MASTERED,
+      },
+    });
 
-    // TODO: Calculate actual streak
-    const currentStreak = 0;
+    // Tính streak: đếm số ngày liên tiếp có activity
+    const currentStreak = await this.calculateStreak(userId);
+
+    // Tính average accuracy
+    const attempts = await this.attemptRepo.find({
+      where: { userId, isCompleted: true },
+      select: ['score'],
+    });
+    const averageAccuracy =
+      attempts.length > 0
+        ? attempts.reduce((sum, a) => sum + Number(a.score), 0) / attempts.length
+        : 0;
 
     const motivationalMessage =
       await this.aiService.generateMotivationalMessage(
@@ -386,9 +470,60 @@ export class AssessmentService {
 
     return {
       examsCompleted,
-      flashcardsMastered,
+      flashcardsMastered: masteredFlashcards,
       currentStreak,
       motivationalMessage,
+      averageAccuracy: Math.round(averageAccuracy * 10) / 10,
     };
+  }
+
+  /**
+   * Tính daily streak bằng cách query lịch sử attempt
+   */
+  private async calculateStreak(userId: string): Promise<number> {
+    // Lấy các attempt trong 30 ngày gần nhất, group by ngày
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const attempts = await this.attemptRepo.find({
+      where: {
+        userId,
+        isCompleted: true,
+        createdAt: MoreThanOrEqual(thirtyDaysAgo),
+      },
+      select: ['createdAt'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (attempts.length === 0) return 0;
+
+    // Lấy unique dates
+    const uniqueDates = new Set<string>(
+      attempts.map((a) => a.createdAt.toISOString().split('T')[0]),
+    );
+
+    // Kiểm tra từ hôm nay hoặc hôm qua
+    const today = new Date().toISOString().split('T')[0];
+    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+    if (!uniqueDates.has(today) && !uniqueDates.has(yesterday)) {
+      return 0; // Streak đã bị ngắt
+    }
+
+    // Đếm ngày liên tiếp
+    let streak = 0;
+    let currentDate = new Date();
+
+    for (let i = 0; i < 30; i++) {
+      const dateStr = currentDate.toISOString().split('T')[0];
+      if (uniqueDates.has(dateStr)) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
   }
 }

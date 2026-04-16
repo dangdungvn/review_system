@@ -5,10 +5,12 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Document } from '../../documents/entities/document.entity';
 
 @Entity('true_false_quizzes')
+@Index(['userId', 'documentId'])
 export class TrueFalseQuiz {
   @PrimaryGeneratedColumn()
   id: number;
@@ -19,6 +21,9 @@ export class TrueFalseQuiz {
   @ManyToOne(() => Document, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'documentId' })
   document: Document;
+
+  @Column()
+  userId: string;
 
   @Column()
   questionNumber: number;
