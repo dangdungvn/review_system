@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  Index,
 } from 'typeorm';
 
 export enum DocumentStatus {
@@ -14,6 +15,7 @@ export enum DocumentStatus {
 }
 
 @Entity('documents')
+@Index(['userId', 'createdAt'])
 export class Document {
   @PrimaryGeneratedColumn()
   id: number;
@@ -35,6 +37,9 @@ export class Document {
 
   @Column({ type: 'enum', enum: DocumentStatus, default: DocumentStatus.PENDING })
   status: DocumentStatus;
+
+  @Column()
+  userId: string;
 
   @CreateDateColumn()
   createdAt: Date;

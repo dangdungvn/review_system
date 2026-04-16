@@ -5,7 +5,6 @@ import {
   Get,
   UseGuards,
   Res,
-  Req,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
@@ -14,9 +13,9 @@ import {
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
-  ApiBody,
 } from '@nestjs/swagger';
-import type { Response, Request } from 'express';
+import type { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -24,12 +23,23 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
+import type { JwtUser } from '../../common/interfaces/jwt-user.interface';
+
+interface RefreshUser {
+  userId: string;
+  email: string;
+  refreshToken: string;
+}
 
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -49,10 +59,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
     const result = await this.authService.register(registerDto);
-
-    // Set cookies cho web client (httpOnly, secure)
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
-
     return result;
   }
 
@@ -75,10 +82,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponseDto> {
     const result = await this.authService.login(loginDto);
-
-    // Set cookies cho web client
     this.setAuthCookies(res, result.accessToken, result.refreshToken);
-
     return result;
   }
 
@@ -92,14 +96,11 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Đăng xuất thành công' })
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
   async logout(
-    @CurrentUser() user: any,
+    @CurrentUser() user: JwtUser,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ message: string }> {
     await this.authService.logout(user.userId);
-
-    // Clear cookies
     this.clearAuthCookies(res);
-
     return { message: 'Đăng xuất thành công' };
   }
 
@@ -125,17 +126,14 @@ export class AuthController {
   })
   @ApiResponse({ status: 401, description: 'Refresh token không hợp lệ' })
   async refresh(
-    @CurrentUser() user: any,
+    @CurrentUser() user: RefreshUser,
     @Res({ passthrough: true }) res: Response,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const tokens = await this.authService.refreshTokens(
       user.userId,
       user.refreshToken,
     );
-
-    // Set cookies cho web client
     this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
-
     return tokens;
   }
 
@@ -151,9 +149,8 @@ export class AuthController {
     type: UserResponseDto,
   })
   @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
-  async getCurrentUser(@CurrentUser() user: any): Promise<UserResponseDto> {
+  async getCurrentUser(@CurrentUser() user: JwtUser): Promise<UserResponseDto> {
     const currentUser = await this.authService.getCurrentUser(user.userId);
-
     return {
       id: currentUser.id,
       email: currentUser.email,
@@ -165,24 +162,23 @@ export class AuthController {
   }
 
   /**
-   * Helper: Set auth cookies cho web client
+   * Helper: Set auth cookies - dùng ConfigService thay process.env
    */
   private setAuthCookies(
     res: Response,
     accessToken: string,
     refreshToken: string,
   ): void {
-    const isProduction = process.env.NODE_ENV === 'production';
+    const isProduction =
+      this.configService.get<string>('NODE_ENV') === 'production';
 
-    // Access token cookie (15 phút)
     res.cookie('access_token', accessToken, {
       httpOnly: true,
-      secure: isProduction, // HTTPS only trong production
+      secure: isProduction,
       sameSite: isProduction ? 'strict' : 'lax',
       maxAge: 15 * 60 * 1000, // 15 phút
     });
 
-    // Refresh token cookie (7 ngày)
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: isProduction,

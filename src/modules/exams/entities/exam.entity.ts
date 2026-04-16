@@ -6,6 +6,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Document } from '../../documents/entities/document.entity';
 import { ExamQuestion } from './exam-question.entity';
@@ -17,6 +18,7 @@ export enum ExamStatus {
 }
 
 @Entity('exams')
+@Index(['userId', 'createdAt'])
 export class Exam {
   @PrimaryGeneratedColumn()
   id: number;
@@ -27,6 +29,9 @@ export class Exam {
   @ManyToOne(() => Document, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'documentId' })
   document: Document;
+
+  @Column()
+  userId: string;
 
   @Column({ length: 255 })
   title: string;

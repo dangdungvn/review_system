@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { Repository, LessThan } from 'typeorm';
 import {
   UserKnowledgeState,
   UserAbility,
@@ -185,7 +185,7 @@ export class RecommendationService {
     const dueFlashcards = await this.flashcardProgressRepo.find({
       where: {
         userId,
-        nextReviewAt: MoreThan(now),
+        nextReviewAt: LessThan(now),
         status: FlashcardStatus.REVIEWING,
       },
       take: 5,

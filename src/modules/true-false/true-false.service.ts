@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { TrueFalseQuiz } from './entities/true-false-quiz.entity';
@@ -16,8 +16,9 @@ export class TrueFalseService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async generate(documentId: number): Promise<TrueFalseQuiz[]> {
-    const document = await this.documentsService.findOne(documentId);
+  async generate(documentId: number, userId: string): Promise<TrueFalseQuiz[]> {
+    // Enforce document ownership
+    const document = await this.documentsService.findOne(documentId, userId);
 
     if (!document.extractedText) {
       throw new NotFoundException('Document has no extracted text');
@@ -31,6 +32,7 @@ export class TrueFalseService {
       const quizzes = result.questions.map((q) =>
         this.quizRepo.create({
           documentId,
+          userId,
           questionNumber: q.questionNumber,
           content: q.content,
           correctAnswer: q.correctAnswer,
@@ -39,17 +41,18 @@ export class TrueFalseService {
       );
 
       return this.quizRepo.save(quizzes);
-    } catch (error) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
       this.logger.error(
-        `Failed to generate true/false questions: ${error.message}`,
+        `Failed to generate true/false questions: ${message}`,
       );
       throw error;
     }
   }
 
-  async findByDocument(documentId: number): Promise<TrueFalseQuiz[]> {
+  async findByDocument(documentId: number, userId: string): Promise<TrueFalseQuiz[]> {
     return this.quizRepo.find({
-      where: { documentId },
+      where: { documentId, userId },
       order: { questionNumber: 'ASC' },
     });
   }

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FlashcardSet, FlashcardSetStatus } from './entities/flashcard-set.entity';
@@ -19,8 +19,9 @@ export class FlashcardsService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async generate(documentId: number): Promise<FlashcardSet> {
-    const document = await this.documentsService.findOne(documentId);
+  async generate(documentId: number, userId: string): Promise<FlashcardSet> {
+    // Enforce document ownership
+    const document = await this.documentsService.findOne(documentId, userId);
 
     if (!document.extractedText) {
       throw new NotFoundException('Document has no extracted text');
@@ -28,6 +29,7 @@ export class FlashcardsService {
 
     const set = this.setRepo.create({
       documentId,
+      userId,
       title: `Flashcards - ${document.title}`,
       status: FlashcardSetStatus.GENERATING,
     });
@@ -50,28 +52,32 @@ export class FlashcardsService {
       await this.cardRepo.save(cards);
       set.totalCards = cards.length;
       set.status = FlashcardSetStatus.COMPLETED;
-    } catch (error) {
-      this.logger.error(`Failed to generate flashcards: ${error.message}`);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to generate flashcards: ${message}`);
       set.status = FlashcardSetStatus.FAILED;
     }
 
     return this.setRepo.save(set);
   }
 
-  async findByDocument(documentId: number): Promise<FlashcardSet[]> {
+  async findByDocument(documentId: number, userId: string): Promise<FlashcardSet[]> {
     return this.setRepo.find({
-      where: { documentId },
+      where: { documentId, userId },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findOne(id: number): Promise<FlashcardSet> {
+  async findOne(id: number, userId?: string): Promise<FlashcardSet> {
     const set = await this.setRepo.findOne({
       where: { id },
       relations: ['flashcards'],
     });
     if (!set) {
       throw new NotFoundException(`FlashcardSet #${id} not found`);
+    }
+    if (userId && set.userId !== userId) {
+      throw new ForbiddenException('Access denied to this flashcard set');
     }
     return set;
   }
