@@ -37,6 +37,16 @@ export class UsersService {
     await this.userRepository.update(userId, { refreshToken });
   }
 
+  async updateAvatar(userId: string, avatarUrl: string | null): Promise<User> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
+    user.avatarUrl = avatarUrl;
+    return this.userRepository.save(user);
+  }
+
   async findAll(): Promise<User[]> {
     return this.userRepository.find();
   }

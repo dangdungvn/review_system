@@ -35,6 +35,9 @@ export class User {
   @Column({ name: 'refresh_token', type: 'text', nullable: true })
   refreshToken: string | null;
 
+  @Column({ name: 'avatar_url', type: 'longtext', nullable: true })
+  avatarUrl: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

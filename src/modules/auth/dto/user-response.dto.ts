@@ -28,6 +28,14 @@ export class UserResponseDto {
   role: UserRole;
 
   @ApiProperty({
+    description: 'Avatar dạng data URL base64',
+    example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
+    nullable: true,
+    required: false,
+  })
+  avatarUrl?: string | null;
+
+  @ApiProperty({
     description: 'Ngày tạo',
     example: '2024-01-01T00:00:00.000Z',
   })

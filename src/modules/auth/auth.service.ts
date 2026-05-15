@@ -68,6 +68,7 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        avatarUrl: user.avatarUrl,
       },
     };
   }
@@ -103,6 +104,7 @@ export class AuthService {
         email: user.email,
         fullName: user.fullName,
         role: user.role,
+        avatarUrl: user.avatarUrl,
       },
     };
   }
@@ -198,5 +200,23 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
     return user;
+  }
+
+  async updateAvatar(userId: string, avatarUrl?: string | null): Promise<User> {
+    const normalizedAvatarUrl = typeof avatarUrl === 'string' ? avatarUrl.trim() : null;
+
+    if (!normalizedAvatarUrl) {
+      return this.usersService.updateAvatar(userId, null);
+    }
+
+    if (!/^data:image\/(png|jpe?g|gif|webp);base64,/i.test(normalizedAvatarUrl)) {
+      throw new BadRequestException('Avatar phải là ảnh PNG, JPG, GIF hoặc WEBP.');
+    }
+
+    if (normalizedAvatarUrl.length > 2_200_000) {
+      throw new BadRequestException('Ảnh avatar tối đa 1.5MB.');
+    }
+
+    return this.usersService.updateAvatar(userId, normalizedAvatarUrl);
   }
 }

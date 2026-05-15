@@ -9,6 +9,7 @@ import { AiModule } from './modules/ai/ai.module';
 import { ExamsModule } from './modules/exams/exams.module';
 import { FlashcardsModule } from './modules/flashcards/flashcards.module';
 import { TrueFalseModule } from './modules/true-false/true-false.module';
+import { SummariesModule } from './modules/summaries/summaries.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AssessmentModule } from './modules/assessment/assessment.module';
@@ -31,6 +32,7 @@ import { AssessmentModule } from './modules/assessment/assessment.module';
     ExamsModule,
     FlashcardsModule,
     TrueFalseModule,
+    SummariesModule,
     AssessmentModule,
   ],
 })

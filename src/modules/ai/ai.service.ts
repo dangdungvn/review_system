@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { examPrompt } from './prompts/exam.prompt';
 import { flashcardPrompt } from './prompts/flashcard.prompt';
+import { summaryPrompt } from './prompts/summary.prompt';
 import { trueFalsePrompt } from './prompts/true-false.prompt';
 
 @Injectable()
@@ -60,6 +61,21 @@ export class AiService {
   }> {
     this.logger.log('Generating flashcards...');
     const raw = await this.generate(flashcardPrompt(), extractedText);
+    return JSON.parse(raw);
+  }
+
+  async generateSummary(extractedText: string): Promise<{
+    summaryTitle: string;
+    overview: string;
+    keyPoints: string[];
+    sections: Array<{
+      heading: string;
+      content: string;
+    }>;
+    suggestedQuestions: string[];
+  }> {
+    this.logger.log('Generating document summary...');
+    const raw = await this.generate(summaryPrompt(), extractedText);
     return JSON.parse(raw);
   }
 

@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   Get,
   UseGuards,
@@ -22,6 +23,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { UserResponseDto } from './dto/user-response.dto';
+import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -159,8 +161,43 @@ export class AuthController {
       email: currentUser.email,
       fullName: currentUser.fullName,
       role: currentUser.role,
+      avatarUrl: currentUser.avatarUrl,
       createdAt: currentUser.createdAt,
       updatedAt: currentUser.updatedAt,
+    };
+  }
+
+  @Patch('avatar')
+  @ApiBearerAuth('JWT')
+  @ApiOperation({
+    summary: 'Cập nhật avatar tài khoản',
+    description: 'Lưu avatar dạng data URL base64 vào hồ sơ người dùng hiện tại',
+  })
+  @ApiBody({ type: UpdateAvatarDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Cập nhật avatar thành công',
+    type: UserResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Avatar không hợp lệ' })
+  @ApiResponse({ status: 401, description: 'Chưa đăng nhập' })
+  async updateAvatar(
+    @CurrentUser() user: any,
+    @Body() updateAvatarDto: UpdateAvatarDto,
+  ): Promise<UserResponseDto> {
+    const updatedUser = await this.authService.updateAvatar(
+      user.userId,
+      updateAvatarDto.avatarUrl,
+    );
+
+    return {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      fullName: updatedUser.fullName,
+      role: updatedUser.role,
+      avatarUrl: updatedUser.avatarUrl,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt,
     };
   }
 

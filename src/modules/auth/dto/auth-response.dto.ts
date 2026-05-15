@@ -13,6 +13,13 @@ class UserInfo {
 
   @ApiProperty({ enum: UserRole, example: UserRole.USER })
   role: UserRole;
+
+  @ApiProperty({
+    example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...',
+    nullable: true,
+    required: false,
+  })
+  avatarUrl?: string | null;
 }
 
 export class AuthResponseDto {

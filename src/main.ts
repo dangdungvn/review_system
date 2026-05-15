@@ -7,10 +7,18 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const corsOriginConfig = process.env.CORS_ORIGIN?.trim();
+  const corsOrigin =
+    !corsOriginConfig || corsOriginConfig === '*'
+      ? true
+      : corsOriginConfig
+          .split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean);
 
   app.setGlobalPrefix('api');
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    origin: corsOrigin,
     credentials: true, // Cho phép gửi cookies
   });
 
