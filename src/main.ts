@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
@@ -19,8 +20,14 @@ async function bootstrap() {
   app.setGlobalPrefix('api');
   app.enableCors({
     origin: corsOrigin,
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'Origin', 'X-Requested-With'],
     credentials: true, // Cho phép gửi cookies
+    optionsSuccessStatus: 204,
   });
+
+  app.use(json({ limit: '8mb' }));
+  app.use(urlencoded({ limit: '8mb', extended: true }));
 
   // Enable cookie parser
   app.use(cookieParser());

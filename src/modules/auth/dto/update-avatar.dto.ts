@@ -9,6 +9,6 @@ export class UpdateAvatarDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(2_200_000, { message: 'Ảnh avatar tối đa 1.5MB.' })
+  @MaxLength(7_200_000, { message: 'Ảnh avatar tối đa 5MB.' })
   avatarUrl?: string | null;
 }

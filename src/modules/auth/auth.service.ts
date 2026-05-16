@@ -213,8 +213,8 @@ export class AuthService {
       throw new BadRequestException('Avatar phải là ảnh PNG, JPG, GIF hoặc WEBP.');
     }
 
-    if (normalizedAvatarUrl.length > 2_200_000) {
-      throw new BadRequestException('Ảnh avatar tối đa 1.5MB.');
+    if (normalizedAvatarUrl.length > 7_200_000) {
+      throw new BadRequestException('Ảnh avatar tối đa 5MB.');
     }
 
     return this.usersService.updateAvatar(userId, normalizedAvatarUrl);
