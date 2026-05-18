@@ -19,8 +19,8 @@ export class FlashcardsService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async generate(documentId: number): Promise<FlashcardSet> {
-    const document = await this.documentsService.findOne(documentId);
+  async generate(documentId: number, userId?: string): Promise<FlashcardSet> {
+    const document = await this.documentsService.findOne(documentId, userId);
 
     if (!document.extractedText) {
       throw new NotFoundException('Document has no extracted text');
@@ -36,6 +36,7 @@ export class FlashcardsService {
     try {
       const result = await this.aiService.generateFlashcards(
         document.extractedText,
+        documentId,
       );
 
       const cards = result.flashcards.map((f, index) =>
@@ -58,19 +59,20 @@ export class FlashcardsService {
     return this.setRepo.save(set);
   }
 
-  async findByDocument(documentId: number): Promise<FlashcardSet[]> {
+  async findByDocument(documentId: number, userId?: string): Promise<FlashcardSet[]> {
+    await this.documentsService.findOne(documentId, userId);
     return this.setRepo.find({
       where: { documentId },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findOne(id: number): Promise<FlashcardSet> {
+  async findOne(id: number, userId?: string): Promise<FlashcardSet> {
     const set = await this.setRepo.findOne({
       where: { id },
-      relations: ['flashcards'],
+      relations: ['flashcards', 'document'],
     });
-    if (!set) {
+    if (!set || (userId && set.document?.userId !== userId)) {
       throw new NotFoundException(`FlashcardSet #${id} not found`);
     }
     return set;

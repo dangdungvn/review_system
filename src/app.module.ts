@@ -13,6 +13,7 @@ import { SummariesModule } from './modules/summaries/summaries.module';
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AssessmentModule } from './modules/assessment/assessment.module';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AssessmentModule } from './modules/assessment/assessment.module';
     }),
     UsersModule,
     AuthModule,
+    AdminModule,
     DocumentsModule,
     AiModule,
     ExamsModule,

@@ -16,8 +16,8 @@ export class TrueFalseService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async generate(documentId: number): Promise<TrueFalseQuiz[]> {
-    const document = await this.documentsService.findOne(documentId);
+  async generate(documentId: number, userId?: string): Promise<TrueFalseQuiz[]> {
+    const document = await this.documentsService.findOne(documentId, userId);
 
     if (!document.extractedText) {
       throw new NotFoundException('Document has no extracted text');
@@ -26,6 +26,8 @@ export class TrueFalseService {
     try {
       const result = await this.aiService.generateTrueFalse(
         document.extractedText,
+        undefined,
+        documentId,
       );
 
       const quizzes = result.questions.map((q) =>
@@ -47,7 +49,8 @@ export class TrueFalseService {
     }
   }
 
-  async findByDocument(documentId: number): Promise<TrueFalseQuiz[]> {
+  async findByDocument(documentId: number, userId?: string): Promise<TrueFalseQuiz[]> {
+    await this.documentsService.findOne(documentId, userId);
     return this.quizRepo.find({
       where: { documentId },
       order: { questionNumber: 'ASC' },

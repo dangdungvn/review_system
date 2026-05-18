@@ -20,12 +20,14 @@ export class DocumentsService {
   async upload(
     file: Express.Multer.File,
     title?: string,
+    userId?: string,
   ): Promise<Document> {
     const doc = this.documentRepo.create({
       title: title || path.parse(file.originalname).name,
       originalFileName: file.originalname,
       filePath: file.path,
       fileSize: file.size,
+      userId: userId || null,
       status: DocumentStatus.PROCESSING,
     });
 
@@ -45,14 +47,16 @@ export class DocumentsService {
     return this.documentRepo.save(doc);
   }
 
-  async findAll(): Promise<Document[]> {
+  async findAll(userId?: string): Promise<Document[]> {
     return this.documentRepo.find({
+      where: userId ? { userId } : undefined,
       order: { createdAt: 'DESC' },
       select: [
         'id',
         'title',
         'originalFileName',
         'fileSize',
+        'userId',
         'status',
         'createdAt',
         'updatedAt',
@@ -60,19 +64,27 @@ export class DocumentsService {
     });
   }
 
-  async findOne(id: number): Promise<Document> {
-    const doc = await this.documentRepo.findOne({ where: { id } });
+  async findOne(id: number, userId?: string): Promise<Document> {
+    const doc = await this.documentRepo.findOne({
+      where: userId ? { id, userId } : { id },
+    });
     if (!doc) {
       throw new NotFoundException(`Document #${id} not found`);
     }
     return doc;
   }
 
-  async delete(id: number): Promise<void> {
-    const doc = await this.findOne(id);
-    if (fs.existsSync(doc.filePath)) {
-      fs.unlinkSync(doc.filePath);
-    }
+  async delete(id: number, userId?: string): Promise<void> {
+    const doc = await this.findOne(id, userId);
+    const filePath = doc.filePath;
     await this.documentRepo.remove(doc);
+
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (error) {
+      this.logger.warn(`Failed to remove PDF file after document delete: ${error.message}`);
+    }
   }
 }

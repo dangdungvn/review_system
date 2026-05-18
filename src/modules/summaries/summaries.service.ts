@@ -16,15 +16,18 @@ export class SummariesService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async generate(documentId: number): Promise<DocumentSummary> {
-    const document = await this.documentsService.findOne(documentId);
+  async generate(documentId: number, userId?: string): Promise<DocumentSummary> {
+    const document = await this.documentsService.findOne(documentId, userId);
 
     if (!document.extractedText) {
       throw new NotFoundException('Document has no extracted text');
     }
 
     try {
-      const result = await this.aiService.generateSummary(document.extractedText);
+      const result = await this.aiService.generateSummary(
+        document.extractedText,
+        documentId,
+      );
 
       const summary = this.summaryRepo.create({
         documentId,
@@ -42,16 +45,20 @@ export class SummariesService {
     }
   }
 
-  async findByDocument(documentId: number): Promise<DocumentSummary[]> {
+  async findByDocument(documentId: number, userId?: string): Promise<DocumentSummary[]> {
+    await this.documentsService.findOne(documentId, userId);
     return this.summaryRepo.find({
       where: { documentId },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findOne(id: number): Promise<DocumentSummary> {
-    const summary = await this.summaryRepo.findOne({ where: { id } });
-    if (!summary) {
+  async findOne(id: number, userId?: string): Promise<DocumentSummary> {
+    const summary = await this.summaryRepo.findOne({
+      where: { id },
+      relations: ['document'],
+    });
+    if (!summary || (userId && summary.document?.userId !== userId)) {
       throw new NotFoundException(`DocumentSummary #${id} not found`);
     }
     return summary;

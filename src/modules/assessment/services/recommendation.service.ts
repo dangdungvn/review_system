@@ -84,7 +84,8 @@ export class RecommendationService {
     if (recommendations.length === 0) {
       // Suggest any exam
       const randomExam = await this.examRepo.findOne({
-        where: {},
+        where: { document: { userId } },
+        relations: ['document'],
         order: { id: 'DESC' },
       });
 
@@ -157,7 +158,8 @@ export class RecommendationService {
     for (const [skillId, state] of weakSkills) {
       // Find flashcard set for this skill
       const flashcardSet = await this.flashcardSetRepo.findOne({
-        where: {},
+        where: { document: { userId: input.userId } },
+        relations: ['document'],
         order: { id: 'ASC' },
       });
 
@@ -229,7 +231,8 @@ export class RecommendationService {
     const attemptedExamIds = input.recentHistory.map((h) => h.examId);
 
     const newExams = await this.examRepo.find({
-      where: {},
+      where: { document: { userId: input.userId } },
+      relations: ['document'],
       take: 3,
     });
 

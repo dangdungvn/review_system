@@ -50,10 +50,10 @@ export class AssessmentService {
       // 1. Get exam with questions
       const exam = await manager.findOne(Exam, {
         where: { id: examId },
-        relations: ['questions'],
+        relations: ['questions', 'document'],
       });
 
-      if (!exam) {
+      if (!exam || exam.document?.userId !== userId) {
         throw new NotFoundException('Exam not found');
       }
 

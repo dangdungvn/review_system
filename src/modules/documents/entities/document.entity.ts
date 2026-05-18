@@ -3,8 +3,11 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  JoinColumn,
+  ManyToOne,
   UpdateDateColumn,
 } from 'typeorm';
+import { User } from '../../users/entities/user.entity';
 
 export enum DocumentStatus {
   PENDING = 'pending',
@@ -29,6 +32,13 @@ export class Document {
 
   @Column()
   fileSize: number;
+
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  userId: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'userId' })
+  user: User | null;
 
   @Column({ type: 'longtext', nullable: true })
   extractedText: string;

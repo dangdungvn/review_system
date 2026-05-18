@@ -6,32 +6,38 @@ import {
   Query,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { FlashcardsService } from './flashcards.service';
-import { Public } from '../../common/decorators/public.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Flashcards')
+@ApiBearerAuth('JWT')
 @Controller('flashcard-sets')
-@Public() // Tạm thời public tất cả endpoints
 export class FlashcardsController {
   constructor(private readonly flashcardsService: FlashcardsService) {}
 
   @Post('generate/:documentId')
   @ApiOperation({ summary: 'Sinh bộ flashcard từ tài liệu' })
-  generate(@Param('documentId', ParseIntPipe) documentId: number) {
-    return this.flashcardsService.generate(documentId);
+  generate(
+    @Param('documentId', ParseIntPipe) documentId: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.flashcardsService.generate(documentId, user.userId);
   }
 
   @Get()
   @ApiOperation({ summary: 'Danh sách bộ flashcard theo tài liệu' })
   @ApiQuery({ name: 'documentId', required: true, type: Number })
-  findByDocument(@Query('documentId', ParseIntPipe) documentId: number) {
-    return this.flashcardsService.findByDocument(documentId);
+  findByDocument(
+    @Query('documentId', ParseIntPipe) documentId: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.flashcardsService.findByDocument(documentId, user.userId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiết bộ flashcard (kèm các card)' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.flashcardsService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.flashcardsService.findOne(id, user.userId);
   }
 }

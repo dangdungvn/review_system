@@ -19,8 +19,8 @@ export class ExamsService {
     private readonly documentsService: DocumentsService,
   ) {}
 
-  async generate(documentId: number): Promise<Exam> {
-    const document = await this.documentsService.findOne(documentId);
+  async generate(documentId: number, userId?: string): Promise<Exam> {
+    const document = await this.documentsService.findOne(documentId, userId);
 
     if (!document.extractedText) {
       throw new NotFoundException('Document has no extracted text');
@@ -36,6 +36,8 @@ export class ExamsService {
     try {
       const result = await this.aiService.generateExam(
         document.extractedText,
+        undefined,
+        documentId,
       );
 
       const questions = result.questions.map((q) =>
@@ -63,19 +65,20 @@ export class ExamsService {
     return this.examRepo.save(exam);
   }
 
-  async findByDocument(documentId: number): Promise<Exam[]> {
+  async findByDocument(documentId: number, userId?: string): Promise<Exam[]> {
+    await this.documentsService.findOne(documentId, userId);
     return this.examRepo.find({
       where: { documentId },
       order: { createdAt: 'DESC' },
     });
   }
 
-  async findOne(id: number): Promise<Exam> {
+  async findOne(id: number, userId?: string): Promise<Exam> {
     const exam = await this.examRepo.findOne({
       where: { id },
-      relations: ['questions'],
+      relations: ['questions', 'document'],
     });
-    if (!exam) {
+    if (!exam || (userId && exam.document?.userId !== userId)) {
       throw new NotFoundException(`Exam #${id} not found`);
     }
     return exam;

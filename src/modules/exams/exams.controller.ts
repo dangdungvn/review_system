@@ -6,32 +6,38 @@ import {
   Query,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ExamsService } from './exams.service';
-import { Public } from '../../common/decorators/public.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Exams')
+@ApiBearerAuth('JWT')
 @Controller('exams')
-@Public() // Tạm thời public tất cả endpoints
 export class ExamsController {
   constructor(private readonly examsService: ExamsService) {}
 
   @Post('generate/:documentId')
   @ApiOperation({ summary: 'Sinh đề thi trắc nghiệm 50 câu từ tài liệu' })
-  generate(@Param('documentId', ParseIntPipe) documentId: number) {
-    return this.examsService.generate(documentId);
+  generate(
+    @Param('documentId', ParseIntPipe) documentId: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.examsService.generate(documentId, user.userId);
   }
 
   @Get()
   @ApiOperation({ summary: 'Danh sách đề thi theo tài liệu' })
   @ApiQuery({ name: 'documentId', required: true, type: Number })
-  findByDocument(@Query('documentId', ParseIntPipe) documentId: number) {
-    return this.examsService.findByDocument(documentId);
+  findByDocument(
+    @Query('documentId', ParseIntPipe) documentId: number,
+    @CurrentUser() user: any,
+  ) {
+    return this.examsService.findByDocument(documentId, user.userId);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiết đề thi (kèm câu hỏi)' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.examsService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {
+    return this.examsService.findOne(id, user.userId);
   }
 }

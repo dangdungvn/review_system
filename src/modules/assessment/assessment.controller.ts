@@ -7,7 +7,12 @@ import {
   ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { AssessmentService } from './services/assessment.service';
 import { RecommendationService } from './services/recommendation.service';
 import {
@@ -22,6 +27,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 
 @ApiTags('Assessment')
+@ApiBearerAuth('JWT')
 @Controller('assessment')
 @UseGuards(JwtAuthGuard)
 export class AssessmentController {

@@ -85,6 +85,10 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tài khoản đã bị khóa');
+    }
+
     // Verify password
     const isPasswordValid = await this.verifyPassword(user.password, password);
     if (!isPasswordValid) {
@@ -126,6 +130,10 @@ export class AuthService {
     const user = await this.usersService.findById(userId);
     if (!user || !user.refreshToken) {
       throw new UnauthorizedException('Access Denied');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tài khoản đã bị khóa');
     }
 
     // Verify refresh token
@@ -199,6 +207,10 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tài khoản đã bị khóa');
+    }
+
     return user;
   }
 
