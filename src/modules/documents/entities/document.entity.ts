@@ -30,6 +30,9 @@ export class Document {
   @Column({ length: 500 })
   filePath: string;
 
+  @Column({ type: 'varchar', length: 500, nullable: true })
+  markdownFilePath: string | null;
+
   @Column()
   fileSize: number;
 
@@ -41,9 +44,13 @@ export class Document {
   user: User | null;
 
   @Column({ type: 'longtext', nullable: true })
-  extractedText: string;
+  extractedText: string | null;
 
-  @Column({ type: 'enum', enum: DocumentStatus, default: DocumentStatus.PENDING })
+  @Column({
+    type: 'enum',
+    enum: DocumentStatus,
+    default: DocumentStatus.PENDING,
+  })
   status: DocumentStatus;
 
   @CreateDateColumn()

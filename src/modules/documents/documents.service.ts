@@ -1,10 +1,9 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
-import { PDFParse } from 'pdf-parse';
+import { DocumentConversionService } from './document-conversion.service';
 import { Document, DocumentStatus } from './entities/document.entity';
 
 @Injectable()
@@ -14,7 +13,7 @@ export class DocumentsService {
   constructor(
     @InjectRepository(Document)
     private readonly documentRepo: Repository<Document>,
-    private readonly configService: ConfigService,
+    private readonly documentConversionService: DocumentConversionService,
   ) {}
 
   async upload(
@@ -34,13 +33,17 @@ export class DocumentsService {
     await this.documentRepo.save(doc);
 
     try {
-      const pdfBuffer = fs.readFileSync(file.path);
-      const parser = new PDFParse(new Uint8Array(pdfBuffer));
-      const pdfData = await parser.getText();
-      doc.extractedText = pdfData.text;
+      const conversion =
+        await this.documentConversionService.convertPdfToMarkdown(file.path);
+      doc.extractedText = conversion.markdown;
+      doc.markdownFilePath = conversion.markdownFilePath;
       doc.status = DocumentStatus.COMPLETED;
     } catch (error) {
-      this.logger.error(`Failed to extract text from PDF: ${error.message}`);
+      this.logger.error(
+        `Failed to convert PDF to Markdown: ${this.getErrorMessage(error)}`,
+      );
+      doc.extractedText = null;
+      doc.markdownFilePath = null;
       doc.status = DocumentStatus.FAILED;
     }
 
@@ -56,6 +59,7 @@ export class DocumentsService {
         'title',
         'originalFileName',
         'fileSize',
+        'markdownFilePath',
         'userId',
         'status',
         'createdAt',
@@ -77,14 +81,26 @@ export class DocumentsService {
   async delete(id: number, userId?: string): Promise<void> {
     const doc = await this.findOne(id, userId);
     const filePath = doc.filePath;
+    const markdownFilePath = doc.markdownFilePath;
     await this.documentRepo.remove(doc);
 
+    this.removeFile(filePath, 'PDF');
+    this.removeFile(markdownFilePath, 'Markdown');
+  }
+
+  private removeFile(filePath: string | null, label: string) {
     try {
-      if (fs.existsSync(filePath)) {
+      if (filePath && fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
       }
     } catch (error) {
-      this.logger.warn(`Failed to remove PDF file after document delete: ${error.message}`);
+      this.logger.warn(
+        `Failed to remove ${label} file after document delete: ${this.getErrorMessage(error)}`,
+      );
     }
+  }
+
+  private getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
   }
 }

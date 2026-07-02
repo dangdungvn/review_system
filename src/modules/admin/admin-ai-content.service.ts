@@ -133,6 +133,8 @@ export class AdminAiContentService {
     const exam = await this.getExamOrFail(id);
     const document = await this.getDocumentWithTextOrFail(exam.documentId);
 
+    exam.userId = exam.userId ?? document.userId ?? null;
+
     exam.status = ExamStatus.GENERATING;
     await this.examRepo.save(exam);
 
@@ -254,6 +256,8 @@ export class AdminAiContentService {
     const set = await this.getFlashcardSetOrFail(id);
     const document = await this.getDocumentWithTextOrFail(set.documentId);
 
+    set.userId = set.userId ?? document.userId ?? null;
+
     set.status = FlashcardSetStatus.GENERATING;
     await this.flashcardSetRepo.save(set);
 
@@ -297,9 +301,12 @@ export class AdminAiContentService {
       });
     }
     if (query.q?.trim()) {
-      qb.andWhere('(summary.title LIKE :keyword OR summary.overview LIKE :keyword)', {
-        keyword: `%${query.q.trim()}%`,
-      });
+      qb.andWhere(
+        '(summary.title LIKE :keyword OR summary.overview LIKE :keyword)',
+        {
+          keyword: `%${query.q.trim()}%`,
+        },
+      );
     }
 
     return this.paginate(qb, query);
@@ -345,6 +352,7 @@ export class AdminAiContentService {
       document.extractedText,
       document.id,
     );
+    summary.userId = summary.userId ?? document.userId ?? null;
     summary.title = result.summaryTitle || summary.title;
     summary.overview = result.overview;
     summary.keyPoints = result.keyPoints ?? [];
@@ -415,6 +423,7 @@ export class AdminAiContentService {
     const quizzes = result.questions.map((question) =>
       this.trueFalseRepo.create({
         documentId,
+        userId: document.userId ?? null,
         questionNumber: question.questionNumber,
         content: question.content,
         correctAnswer: question.correctAnswer,
@@ -428,7 +437,9 @@ export class AdminAiContentService {
     });
   }
 
-  private async getDocumentWithTextOrFail(documentId: number) {
+  private async getDocumentWithTextOrFail(
+    documentId: number,
+  ): Promise<Document & { extractedText: string }> {
     const document = await this.documentRepo.findOne({
       where: { id: documentId },
     });
@@ -438,7 +449,7 @@ export class AdminAiContentService {
     if (!document.extractedText) {
       throw new BadRequestException('Tài liệu chưa có extracted text');
     }
-    return document;
+    return document as Document & { extractedText: string };
   }
 
   private async getExamOrFail(id: number) {
@@ -472,7 +483,11 @@ export class AdminAiContentService {
   }
 
   private async paginate<T>(
-    qb: { skip: (skip: number) => any; take: (take: number) => any; getManyAndCount: () => Promise<[T[], number]> },
+    qb: {
+      skip: (skip: number) => any;
+      take: (take: number) => any;
+      getManyAndCount: () => Promise<[T[], number]>;
+    },
     query: AdminAiContentQueryDto,
   ) {
     const page = query.page ?? 1;

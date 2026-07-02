@@ -3,6 +3,7 @@ import { FlashcardSetStatus } from '../entities/flashcard-set.entity';
 export class FlashcardSetResponseDto {
   id: number;
   documentId: number;
+  userId: string | null;
   title: string;
   totalCards: number;
   status: FlashcardSetStatus;

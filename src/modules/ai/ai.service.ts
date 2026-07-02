@@ -1,4 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  BadRequestException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Repository } from 'typeorm';
@@ -16,6 +24,8 @@ import {
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
+  private readonly requestTimeoutMs = 180_000;
+  private readonly retryDelaysMs = [750, 1500];
 
   constructor(
     private readonly aiSettingsService: AiSettingsService,
@@ -29,21 +39,29 @@ export class AiService {
     settings: EffectiveAiSettings,
   ): Promise<string> {
     const genAI = new GoogleGenerativeAI(settings.apiKey);
-    const model = genAI.getGenerativeModel({ model: settings.model });
+    const model = genAI.getGenerativeModel(
+      { model: settings.model },
+      { timeout: this.requestTimeoutMs },
+    );
 
     const truncatedContent =
       content.length > settings.maxInputChars
         ? content.substring(0, settings.maxInputChars)
         : content;
 
-    const result = await model.generateContent([
-      systemPrompt,
-      `NỘI DUNG TÀI LIỆU:\n\n${truncatedContent}`,
-    ]);
+    const result = await this.generateContentWithRetry(() =>
+      model.generateContent([
+        systemPrompt,
+        `NỘI DUNG TÀI LIỆU:\n\n${truncatedContent}`,
+      ]),
+    );
 
     const text = result.response.text();
     // Remove markdown code blocks if present
-    return text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    return text
+      .replace(/```json\n?/g, '')
+      .replace(/```\n?/g, '')
+      .trim();
   }
 
   private async generateJson<T>(options: {
@@ -98,13 +116,15 @@ export class AiService {
           outputChars,
           durationMs: Date.now() - startedAt,
           errorType: 'parsing',
-          errorMessage: error.message,
+          errorMessage: this.getErrorMessage(error),
           metadata: options.metadata,
         });
-        throw error;
+        throw new BadGatewayException(
+          'AI provider returned invalid JSON. Please try again.',
+        );
       }
     } catch (error) {
-      if (error instanceof SyntaxError) {
+      if (error instanceof HttpException) {
         throw error;
       }
 
@@ -117,12 +137,102 @@ export class AiService {
         truncatedChars,
         outputChars,
         durationMs: Date.now() - startedAt,
-        errorType: error.name || 'generation',
-        errorMessage: error.message,
+        errorType: this.getErrorName(error),
+        errorMessage: this.getErrorMessage(error),
         metadata: options.metadata,
       });
-      throw error;
+      throw this.toClientException(error);
     }
+  }
+
+  private async generateContentWithRetry<T>(
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await operation();
+      } catch (error) {
+        const delayMs = this.retryDelaysMs[attempt];
+        if (!delayMs || !this.isRetryableAiError(error)) {
+          throw error;
+        }
+
+        this.logger.warn(
+          `Gemini request failed (${this.getErrorMessage(
+            error,
+          )}); retrying in ${delayMs}ms`,
+        );
+        await this.sleep(delayMs);
+      }
+    }
+  }
+
+  private isRetryableAiError(error: unknown) {
+    const errorLike = error as {
+      status?: number;
+      cause?: { code?: string; message?: string };
+    };
+    const status = errorLike.status;
+    const message = this.getErrorMessage(error).toLowerCase();
+    const causeCode = errorLike.cause?.code?.toLowerCase() ?? '';
+    const causeMessage = errorLike.cause?.message?.toLowerCase() ?? '';
+
+    return (
+      (typeof status === 'number' && status >= 500) ||
+      message.includes('fetch failed') ||
+      message.includes('request aborted') ||
+      causeMessage.includes('fetch failed') ||
+      ['econnreset', 'etimedout', 'enotfound', 'eai_again'].includes(causeCode)
+    );
+  }
+
+  private sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private toClientException(error: unknown) {
+    const errorLike = error as { status?: number };
+    const message = this.getErrorMessage(error);
+    const normalizedMessage = message.toLowerCase();
+
+    if (message.includes('GEMINI_API_KEY')) {
+      return new ServiceUnavailableException(
+        'Gemini API key is not configured',
+      );
+    }
+
+    if (normalizedMessage.includes('api key not valid')) {
+      return new BadRequestException('Gemini API key is invalid');
+    }
+
+    if (
+      errorLike.status === 429 ||
+      normalizedMessage.includes('too many requests') ||
+      normalizedMessage.includes('exceeded your current quota')
+    ) {
+      return new HttpException(
+        'Gemini quota or rate limit exceeded. Please check billing/quota or try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    if (errorLike.status === 503 || normalizedMessage.includes('high demand')) {
+      return new ServiceUnavailableException(
+        'Gemini model is currently overloaded. Please try again later.',
+      );
+    }
+
+    return new ServiceUnavailableException(
+      'AI provider is unavailable. Please try again.',
+    );
+  }
+
+  private getErrorName(error: unknown) {
+    return error instanceof Error && error.name ? error.name : 'generation';
+  }
+
+  private getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
   }
 
   private async writeGenerationLog(log: {
@@ -155,7 +265,10 @@ export class AiService {
     );
   }
 
-  private renderPromptOverride(prompt: string, values: Record<string, unknown>) {
+  private renderPromptOverride(
+    prompt: string,
+    values: Record<string, unknown>,
+  ) {
     return Object.entries(values).reduce(
       (result, [key, value]) =>
         result.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), String(value)),
@@ -196,7 +309,10 @@ export class AiService {
     });
   }
 
-  async generateFlashcards(extractedText: string, documentId?: number): Promise<{
+  async generateFlashcards(
+    extractedText: string,
+    documentId?: number,
+  ): Promise<{
     flashcards: Array<{
       front: string;
       back: string;
@@ -213,7 +329,10 @@ export class AiService {
     });
   }
 
-  async generateSummary(extractedText: string, documentId?: number): Promise<{
+  async generateSummary(
+    extractedText: string,
+    documentId?: number,
+  ): Promise<{
     summaryTitle: string;
     overview: string;
     keyPoints: string[];
@@ -247,8 +366,7 @@ export class AiService {
     }>;
   }> {
     const settings = await this.aiSettingsService.getEffectiveSettings();
-    const questionCount =
-      totalQuestions ?? settings.trueFalseTotalQuestions;
+    const questionCount = totalQuestions ?? settings.trueFalseTotalQuestions;
     this.logger.log(`Generating ${questionCount} true/false questions...`);
 
     return this.generateJson({

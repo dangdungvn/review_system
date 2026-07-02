@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AiModule } from '../ai/ai.module';
+import { DocumentsModule } from '../documents/documents.module';
 import { AdminAiContentService } from './admin-ai-content.service';
 import { AdminAiMonitoringService } from './admin-ai-monitoring.service';
 import { AdminDashboardService } from './admin-dashboard.service';
@@ -45,6 +46,7 @@ import { AiGenerationLog } from '../ai/entities/ai-generation-log.entity';
       UserTrueFalseAttempt,
     ]),
     AiModule,
+    DocumentsModule,
   ],
   controllers: [AdminController],
   providers: [

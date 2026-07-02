@@ -52,7 +52,7 @@ export class DocumentsController {
           cb(null, `${uuidv4()}${ext}`);
         },
       }),
-      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+      limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
       fileFilter: (_req, file, cb) => {
         if (file.mimetype !== 'application/pdf') {
           return cb(new Error('Only PDF files are allowed'), false);

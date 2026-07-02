@@ -6,8 +6,10 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { Document } from '../../documents/entities/document.entity';
+import { User } from '../../users/entities/user.entity';
 import { ExamQuestion } from './exam-question.entity';
 
 export enum ExamStatus {
@@ -27,6 +29,14 @@ export class Exam {
   @ManyToOne(() => Document, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'documentId' })
   document: Document;
+
+  @Index('IDX_exams_userId')
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  userId: string | null;
+
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'userId' })
+  user: User | null;
 
   @Column({ length: 255 })
   title: string;

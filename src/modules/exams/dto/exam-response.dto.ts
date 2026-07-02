@@ -3,6 +3,7 @@ import { ExamStatus } from '../entities/exam.entity';
 export class ExamResponseDto {
   id: number;
   documentId: number;
+  userId: string | null;
   title: string;
   totalQuestions: number;
   status: ExamStatus;

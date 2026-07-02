@@ -7,8 +7,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
-import { PDFParse } from 'pdf-parse';
-import { Document, DocumentStatus } from '../documents/entities/document.entity';
+import { DocumentConversionService } from '../documents/document-conversion.service';
+import {
+  Document,
+  DocumentStatus,
+} from '../documents/entities/document.entity';
 import { AdminDocumentQueryDto } from './dto/admin-document-query.dto';
 
 @Injectable()
@@ -18,6 +21,7 @@ export class AdminDocumentsService {
   constructor(
     @InjectRepository(Document)
     private readonly documentRepo: Repository<Document>,
+    private readonly documentConversionService: DocumentConversionService,
   ) {}
 
   async findAll(query: AdminDocumentQueryDto) {
@@ -31,6 +35,7 @@ export class AdminDocumentsService {
         'document.title',
         'document.originalFileName',
         'document.filePath',
+        'document.markdownFilePath',
         'document.fileSize',
         'document.userId',
         'document.status',
@@ -113,15 +118,11 @@ export class AdminDocumentsService {
     }
 
     const filePath = document.filePath;
+    const markdownFilePath = document.markdownFilePath;
     await this.documentRepo.remove(document);
 
-    try {
-      if (filePath && fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    } catch (error) {
-      this.logger.warn(`Failed to remove PDF file after document delete: ${error.message}`);
-    }
+    this.removeFile(filePath, 'PDF');
+    this.removeFile(markdownFilePath, 'Markdown');
 
     return {
       message: 'Đã xóa tài liệu và các nội dung phát sinh liên quan',
@@ -135,7 +136,9 @@ export class AdminDocumentsService {
     }
 
     if (document.status !== DocumentStatus.FAILED) {
-      throw new BadRequestException('Chỉ retry tài liệu đang ở trạng thái failed');
+      throw new BadRequestException(
+        'Chỉ retry tài liệu đang ở trạng thái failed',
+      );
     }
 
     if (!document.filePath || !fs.existsSync(document.filePath)) {
@@ -146,14 +149,19 @@ export class AdminDocumentsService {
     await this.documentRepo.save(document);
 
     try {
-      const pdfBuffer = fs.readFileSync(document.filePath);
-      const parser = new PDFParse(new Uint8Array(pdfBuffer));
-      const pdfData = await parser.getText();
-
-      document.extractedText = pdfData.text;
+      const conversion =
+        await this.documentConversionService.convertPdfToMarkdown(
+          document.filePath,
+        );
+      document.extractedText = conversion.markdown;
+      document.markdownFilePath = conversion.markdownFilePath;
       document.status = DocumentStatus.COMPLETED;
     } catch (error) {
-      this.logger.error(`Retry PDF processing failed: ${error.message}`);
+      this.logger.error(
+        `Retry PDF processing failed: ${this.getErrorMessage(error)}`,
+      );
+      document.extractedText = null;
+      document.markdownFilePath = null;
       document.status = DocumentStatus.FAILED;
     }
 
@@ -166,6 +174,7 @@ export class AdminDocumentsService {
       title: document.title,
       originalFileName: document.originalFileName,
       filePath: document.filePath,
+      markdownFilePath: document.markdownFilePath,
       fileSize: document.fileSize,
       fileSizeMB: Number((document.fileSize / 1024 / 1024).toFixed(2)),
       status: document.status,
@@ -181,5 +190,21 @@ export class AdminDocumentsService {
       createdAt: document.createdAt,
       updatedAt: document.updatedAt,
     };
+  }
+
+  private removeFile(filePath: string | null, label: string) {
+    try {
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to remove ${label} file after document delete: ${this.getErrorMessage(error)}`,
+      );
+    }
+  }
+
+  private getErrorMessage(error: unknown) {
+    return error instanceof Error ? error.message : String(error);
   }
 }

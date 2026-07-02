@@ -42,3 +42,8 @@ lerna-debug.log*
 
 # temp
 _temp_skills/
+
+# MarkItDown source and virtualenv
+/.venv-markitdown
+/vendor/markitdown
+

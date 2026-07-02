@@ -95,7 +95,7 @@ Swagger UI: **http://localhost:3000/api/docs**
 **POST /api/documents/upload**
 
 1. Click **"Try it out"**
-2. Click **"Choose File"** → chọn file PDF (max 10MB)
+2. Click **"Choose File"** → chọn file PDF (max 15MB)
 3. Nhập `title` (tùy chọn)
 4. Click **"Execute"**
 
