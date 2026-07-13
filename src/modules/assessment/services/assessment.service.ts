@@ -391,4 +391,159 @@ export class AssessmentService {
       motivationalMessage,
     };
   }
+  async getReviewActivities(userId: string) {
+    const [examAttempts, trueFalseAttempts, flashcardProgress] =
+      await Promise.all([
+        this.dataSource.query(
+          `
+            SELECT
+              attempt.id,
+              attempt.examId,
+              attempt.score,
+              attempt.correctAnswers,
+              attempt.totalQuestions,
+              attempt.totalTimeSpentSeconds,
+              attempt.created_at,
+              attempt.completedAt,
+              exam.title AS exerciseTitle,
+              document.id AS documentId,
+              document.title AS subjectTitle
+            FROM user_exam_attempts attempt
+            INNER JOIN exams exam ON exam.id = attempt.examId
+            INNER JOIN documents document ON document.id = exam.documentId
+            WHERE attempt.userId = ?
+            ORDER BY COALESCE(attempt.completedAt, attempt.created_at) DESC
+          `,
+          [userId],
+        ),
+        this.dataSource.query(
+          `
+            SELECT
+              attempt.id,
+              attempt.quizId,
+              attempt.isCorrect,
+              attempt.reactionTimeMs,
+              attempt.answered_at,
+              quiz.questionNumber,
+              document.id AS documentId,
+              document.title AS subjectTitle
+            FROM user_true_false_attempts attempt
+            INNER JOIN true_false_quizzes quiz ON quiz.id = attempt.quizId
+            INNER JOIN documents document ON document.id = quiz.documentId
+            WHERE attempt.userId = ?
+            ORDER BY attempt.answered_at DESC
+          `,
+          [userId],
+        ),
+        this.dataSource.query(
+          `
+            SELECT
+              progress.id,
+              progress.flashcardId,
+              progress.correctCount,
+              progress.totalReviews,
+              progress.masteryLevel,
+              progress.lastReviewedAt,
+              progress.updated_at,
+              flashcardSet.id AS flashcardSetId,
+              flashcardSet.title AS exerciseTitle,
+              document.id AS documentId,
+              document.title AS subjectTitle
+            FROM user_flashcard_progress progress
+            INNER JOIN flashcards flashcard ON flashcard.id = progress.flashcardId
+            INNER JOIN flashcard_sets flashcardSet ON flashcardSet.id = flashcard.flashcardSetId
+            INNER JOIN documents document ON document.id = flashcardSet.documentId
+            WHERE progress.userId = ?
+            ORDER BY COALESCE(progress.lastReviewedAt, progress.updated_at) DESC
+          `,
+          [userId],
+        ),
+      ]);
+
+    const activities = [
+      ...examAttempts.map((attempt: any) => {
+        const completedAt = attempt.completedAt ?? attempt.created_at;
+        const durationSeconds = Number(attempt.totalTimeSpentSeconds) || 0;
+        const startedAt = new Date(
+          new Date(completedAt).getTime() - durationSeconds * 1000,
+        );
+        const correctCount = Number(attempt.correctAnswers) || 0;
+        const totalItems = Number(attempt.totalQuestions) || 0;
+
+        return {
+          id: `exam-attempt-${attempt.id}`,
+          type: 'quiz',
+          subjectId: String(attempt.documentId),
+          subjectTitle: attempt.subjectTitle,
+          exerciseId: String(attempt.examId),
+          exerciseTitle: attempt.exerciseTitle,
+          documentId: String(attempt.documentId),
+          startedAt: startedAt.toISOString(),
+          completedAt: new Date(completedAt).toISOString(),
+          durationSeconds,
+          progress: 100,
+          score: Number(attempt.score) || 0,
+          correctCount,
+          wrongCount: Math.max(0, totalItems - correctCount),
+          blankCount: 0,
+          totalItems,
+        };
+      }),
+      ...trueFalseAttempts.map((attempt: any) => {
+        const isCorrect = Boolean(Number(attempt.isCorrect));
+
+        return {
+          id: `true-false-attempt-${attempt.id}`,
+          type: 'quiz',
+          subjectId: String(attempt.documentId),
+          subjectTitle: attempt.subjectTitle,
+          exerciseId: String(attempt.quizId),
+          exerciseTitle: `Câu dúng/sai ${attempt.questionNumber}`,
+          documentId: String(attempt.documentId),
+          startedAt: new Date(attempt.answered_at).toISOString(),
+          completedAt: new Date(attempt.answered_at).toISOString(),
+          durationSeconds: Math.max(
+            1,
+            Math.round((Number(attempt.reactionTimeMs) || 0) / 1000),
+          ),
+          progress: 100,
+          score: isCorrect ? 100 : 0,
+          correctCount: isCorrect ? 1 : 0,
+          wrongCount: isCorrect ? 0 : 1,
+          blankCount: 0,
+          totalItems: 1,
+        };
+      }),
+      ...flashcardProgress.map((progress: any) => {
+        const completedAt = progress.lastReviewedAt ?? progress.updated_at;
+        const totalItems = Number(progress.totalReviews) || 0;
+        const correctCount = Number(progress.correctCount) || 0;
+
+        return {
+          id: `flashcard-progress-${progress.id}`,
+          type: 'flashcard',
+          subjectId: String(progress.documentId),
+          subjectTitle: progress.subjectTitle,
+          exerciseId: String(progress.flashcardSetId),
+          exerciseTitle: progress.exerciseTitle,
+          documentId: String(progress.documentId),
+          startedAt: new Date(completedAt).toISOString(),
+          completedAt: new Date(completedAt).toISOString(),
+          durationSeconds: Math.max(30, totalItems * 45),
+          progress: Math.round((Number(progress.masteryLevel) || 0) * 100),
+          score: Math.round((Number(progress.masteryLevel) || 0) * 100),
+          correctCount,
+          wrongCount: Math.max(0, totalItems - correctCount),
+          blankCount: 0,
+          totalItems,
+        };
+      }),
+    ];
+
+    return activities.sort(
+      (left, right) =>
+        new Date(right.completedAt).getTime() -
+        new Date(left.completedAt).getTime(),
+    );
+  }
 }

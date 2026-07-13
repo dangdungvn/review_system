@@ -491,7 +491,8 @@ Access to fetch at 'http://localhost:3000/api/auth/login' from origin
 ```
 
 **Giải pháp:**
-- Thêm origin vào `.env`: `CORS_ORIGIN=http://localhost:5173`
+- Thêm origin vào `.env`: `CORS_ORIGIN=http://localhost:5173,https://frontend-domain-cua-ban.com`
+- Có thể khai báo nhiều origin, phân tách bằng dấu phẩy
 - Đảm bảo `credentials: 'include'` trong fetch options
 
 ### Lỗi "Invalid token" khi gọi API

@@ -178,8 +178,14 @@ Response: Bộ câu hỏi đúng/sai kèm giải thích.
 
 ### Lỗi CORS khi gọi từ frontend
 Thêm origin vào `.env`:
+```env
+# Dev + deploy: có thể khai báo nhiều origin, phân tách bằng dấu phẩy
+CORS_ORIGIN=http://localhost:5173,https://imminent-subway-seventy.ngrok-free.dev
 ```
-CORS_ORIGIN=http://localhost:5173
+
+Nếu muốn mở cho mọi origin trong môi trường thử nghiệm, dùng:
+```env
+CORS_ORIGIN=*
 ```
 
 ### Lỗi kết nối database

@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Delete,
+  Patch,
   Param,
   Body,
   ParseIntPipe,
@@ -22,6 +23,7 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { DocumentsService } from './documents.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
 @ApiTags('Documents')
@@ -81,6 +83,15 @@ export class DocumentsController {
     return this.documentsService.findOne(id, user.userId);
   }
 
+  @Patch(':id')
+  @ApiOperation({ summary: 'C?p nh?t t�i li?u' })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateDocumentDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.documentsService.update(id, dto, user.userId);
+  }
   @Delete(':id')
   @ApiOperation({ summary: 'Xoá tài liệu' })
   delete(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: any) {

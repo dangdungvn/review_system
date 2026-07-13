@@ -91,6 +91,13 @@ export class AssessmentController {
     return await this.recommendationService.getNextActivity(user.id);
   }
 
+  @Get('review-activities')
+  @ApiOperation({
+    summary: 'Get normalized review activities for statistics charts',
+  })
+  async getReviewActivities(@CurrentUser() user: User) {
+    return await this.assessmentService.getReviewActivities(user.id);
+  }
   @Get('progress')
   @ApiOperation({
     summary: 'Get user progress',

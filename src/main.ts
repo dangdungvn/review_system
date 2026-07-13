@@ -21,7 +21,14 @@ async function bootstrap() {
   app.enableCors({
     origin: corsOrigin,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'Origin', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'Origin',
+      'X-Requested-With',
+      'ngrok-skip-browser-warning',
+    ],
     credentials: true, // Cho phép gửi cookies
     optionsSuccessStatus: 204,
   });
