@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+﻿import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as fs from 'fs';
@@ -41,6 +41,16 @@ export type DocumentWithExercises = Document & {
   completedCount: number;
 };
 
+export interface PaginatedDocuments {
+  items: DocumentWithExercises[];
+  meta: {
+    page: number;
+    limit: number;
+    totalItems: number;
+    totalPages: number;
+  };
+}
+
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
@@ -63,9 +73,11 @@ export class DocumentsService {
     file: Express.Multer.File,
     title?: string,
     userId?: string,
+    description?: string,
   ): Promise<Document> {
     const doc = this.documentRepo.create({
       title: title || path.parse(file.originalname).name,
+      description: description?.trim() || null,
       originalFileName: file.originalname,
       filePath: file.path,
       fileSize: file.size,
@@ -93,13 +105,22 @@ export class DocumentsService {
     return this.documentRepo.save(doc);
   }
 
-  async findAll(userId?: string): Promise<DocumentWithExercises[]> {
-    const documents = await this.documentRepo.find({
+  async findAll(
+    userId?: string,
+    page = 1,
+    limit = 10,
+  ): Promise<PaginatedDocuments> {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.min(50, Math.max(1, Number(limit) || 10));
+    const [documents, totalItems] = await this.documentRepo.findAndCount({
       where: userId ? { userId } : undefined,
       order: { createdAt: 'DESC' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
       select: [
         'id',
         'title',
+        'description',
         'originalFileName',
         'fileSize',
         'markdownFilePath',
@@ -110,7 +131,17 @@ export class DocumentsService {
       ],
     });
 
-    return this.attachExercises(documents, userId);
+    const items = await this.attachExercises(documents, userId);
+
+    return {
+      items,
+      meta: {
+        page: safePage,
+        limit: safeLimit,
+        totalItems,
+        totalPages: Math.max(1, Math.ceil(totalItems / safeLimit)),
+      },
+    };
   }
 
   async findOne(id: number, userId?: string): Promise<DocumentWithExercises> {
@@ -143,7 +174,10 @@ export class DocumentsService {
         doc.title = nextTitle;
       }
     }
-
+    if (dto.description !== undefined) {
+      const nextDescription = dto.description.trim();
+      doc.description = nextDescription || null;
+    }
     await this.documentRepo.save(doc);
     return this.findOne(id, userId);
   }

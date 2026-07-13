@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+﻿import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 
 export class UploadDocumentDto {
@@ -6,4 +6,9 @@ export class UploadDocumentDto {
   @IsOptional()
   @IsString()
   title?: string;
+
+  @ApiPropertyOptional({ description: 'Mô tả tài liệu / môn học' })
+  @IsOptional()
+  @IsString()
+  description?: string;
 }

@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+﻿import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UpdateDocumentDto {
@@ -7,4 +7,9 @@ export class UpdateDocumentDto {
   @IsString()
   @MaxLength(255)
   title?: string;
+
+  @ApiPropertyOptional({ description: 'Mô tả tài liệu / môn học' })
+  @IsOptional()
+  @IsString()
+  description?: string;
 }

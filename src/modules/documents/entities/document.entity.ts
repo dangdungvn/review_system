@@ -1,4 +1,4 @@
-import {
+﻿import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
@@ -23,6 +23,9 @@ export class Document {
 
   @Column({ length: 255 })
   title: string;
+
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
 
   @Column({ length: 255 })
   originalFileName: string;

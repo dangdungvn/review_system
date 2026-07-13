@@ -1,10 +1,11 @@
-import {
+﻿import {
   Controller,
   Post,
   Get,
   Delete,
   Patch,
   Param,
+  Query,
   Body,
   ParseIntPipe,
   UseInterceptors,
@@ -68,13 +69,21 @@ export class DocumentsController {
     @Body() dto: UploadDocumentDto,
     @CurrentUser() user: any,
   ) {
-    return this.documentsService.upload(file, dto.title, user.userId);
+    return this.documentsService.upload(file, dto.title, user.userId, dto.description);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Danh sách tài liệu' })
-  findAll(@CurrentUser() user: any) {
-    return this.documentsService.findAll(user.userId);
+  @ApiOperation({ summary: 'Danh s�ch t�i li?u' })
+  findAll(
+    @CurrentUser() user: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.documentsService.findAll(
+      user.userId,
+      Number(page) || 1,
+      Number(limit) || 10,
+    );
   }
 
   @Get(':id')
@@ -84,7 +93,7 @@ export class DocumentsController {
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'C?p nh?t t�i li?u' })
+  @ApiOperation({ summary: 'C?p nh?t t�i li?u' })
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateDocumentDto,
